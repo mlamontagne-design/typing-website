@@ -604,6 +604,7 @@ function startLesson(rank, element) {
         displayElement.style.display = 'block';
         
         if (rank === "Master 2") {
+            kbContainer.style.display = 'none'; // ADD THIS LINE
             setupMaster2Mission(0);
             return;
         }
