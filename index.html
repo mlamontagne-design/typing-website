@@ -39,9 +39,32 @@
         .stat-val { color: var(--primary); margin-left: 5px; }
 
         /* Typing Display */
-        #display-container { width: 100%; max-width: 850px; flex: 1; background: white; padding: 40px; border-radius: 15px; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.1); overflow-y: auto; scroll-behavior: smooth;
-    position: relative; mask-image: linear-gradient(to bottom, transparent, black 15%, black 85%, transparent);
-    -webkit-mask-image: linear-gradient(to bottom, transparent, black 15%, black 85%, transparent); }
+        #display-container { 
+    width: 100%; 
+    max-width: 850px; 
+    flex: 1; 
+    background: white; 
+    padding: 30px 40px; 
+    border-radius: 15px; 
+    box-shadow: 0 10px 25px -5px rgba(0,0,0,0.1); 
+    overflow-y: auto; 
+    position: relative;
+    transition: mask-image 0.3s;
+}
+
+/* This class will be added/removed via JavaScript */
+.faded {
+    mask-image: linear-gradient(to bottom, 
+        transparent 0%, 
+        black var(--top-fade, 0%), 
+        black var(--bottom-fade, 100%), 
+        transparent 100%);
+    -webkit-mask-image: linear-gradient(to bottom, 
+        transparent 0%, 
+        black var(--top-fade, 0%), 
+        black var(--bottom-fade, 100%), 
+        transparent 100%);
+}
         #display { width: 100%; font-family: 'Courier New', Courier, monospace; line-height: 2.2; color: #94a3b8; font-size: 1.8rem; text-align: left; }
         .word-block { display: inline-block; white-space: nowrap; margin-right: 0.3em; }
         .char { position: relative; }
@@ -266,7 +289,7 @@
         <p style="font-size: 0.9rem; font-weight: normal; color: #94a3b8;">(Placeholder for YouTube/Vimeo embed)</p>
     </div>
 </div>
-
+<div id="finger-indicator" style="height: 30px; text-align: center; font-weight: 600; color: var(--primary); margin-bottom: 5px; font-size: 1.1rem;"></div>
     <div id="keyboard-container">
         <div class="kb-row">
             <div class="key lp" id="key-` border" data-finger="LP">`</div>
@@ -341,6 +364,26 @@
 </main>
 
 <script>
+let typingBuffer = ""; 
+const fingerMap = {
+    'q': 'Left Pinky', 'a': 'Left Pinky', 'z': 'Left Pinky', '1': 'Left Pinky', '`': 'Left Pinky',
+    'w': 'Left Ring', 's': 'Left Ring', 'x': 'Left Ring', '2': 'Left Ring',
+    'e': 'Left Middle', 'd': 'Left Middle', 'c': 'Left Middle', '3': 'Left Middle',
+    'r': 'Left Index', 'f': 'Left Index', 'v': 'Left Index', '4': 'Left Index',
+    't': 'Left Index', 'g': 'Left Index', 'b': 'Left Index', '5': 'Left Index',
+    'y': 'Right Index', 'h': 'Right Index', 'n': 'Right Index', '6': 'Right Index',
+    'u': 'Right Index', 'j': 'Right Index', 'm': 'Right Index', '7': 'Right Index',
+    'i': 'Right Middle', 'k': 'Right Middle', ',': 'Right Middle', '8': 'Right Middle',
+    'o': 'Right Ring', 'l': 'Right Ring', '.': 'Right Ring', '9': 'Right Ring',
+    'p': 'Right Pinky', ';': 'Right Pinky', '/': 'Right Pinky', '0': 'Right Pinky', '-': 'Right Pinky', '=': 'Right Pinky',
+    ' ': 'Right Thumb',
+    'shift': 'Pinky',
+    'control': 'Pinky',
+    'alt': 'Ring Finger',
+    'meta': 'Left Pinky',
+    'enter': 'Right Pinky',
+    'backspace': 'Right Pinky'
+};
 const rankRegistry = {
     "Beginner 2": ["j", "f", " ", "u", "r", "k", "d", "e", "i", "c", "g", "n"],
     "Beginner 3": ["t", "s", "l", "o", "b", "a", "v", "h", "m", ".", ","],
@@ -528,10 +571,26 @@ function startLesson(rank, element) {
     if (element) element.classList.add('active');
     
     currentRank = rank;
-    input.disabled = false;
-    
     const videoPlaceholder = document.getElementById('video-placeholder');
     const displayElement = document.getElementById('display');
+    const fingerIndicator = document.getElementById('finger-indicator');
+
+    // NEW: If no rank is selected, show the Landing Page
+    if (!rank) {
+    displayElement.innerHTML = `
+        <div style="text-align: center; color: #64748b; max-width: 600px; margin: 0 auto;">
+            <h2 style="color: #1e293b; margin-bottom: 10px; font-size: 1.5rem;">Welcome to Typing Ranks!</h2>
+            <p style="margin: 5px 0;">Select a rank on the left to begin your journey,</p>
+            <p style="margin: 5px 0;">or <strong>press any key</strong> to see which finger you should use.</p>
+        </div>`;
+    videoPlaceholder.style.display = 'none';
+    displayElement.style.display = 'block';
+    kbContainer.style.display = 'flex';
+    fingerIndicator.innerText = "Waiting for keypress...";
+    return;
+}
+
+    fingerIndicator.innerText = "";
 
     if (rank === "Beginner 1") {
         text = "fjfj fjf jfjf fdkj ddkj ffff jjjj kkkk fjd kjf dddd";
@@ -569,6 +628,50 @@ function startLesson(rank, element) {
     highlightKey();
     input.focus();
 }
+
+// 1. Add this right above your input.addEventListener block
+document.addEventListener('keydown', (e) => {
+    // 1. Track keys for Easter Eggs
+    typingBuffer += e.key.toLowerCase();
+    if (typingBuffer.length > 10) typingBuffer = typingBuffer.slice(-10);
+
+    const eggs = {
+        "lol": "You're funny! 😂",
+        "jk": "Kidding? Are you sure? 😉"
+    };
+
+    for (let key in eggs) {
+        if (typingBuffer.endsWith(key)) {
+            alert(eggs[key]);
+        }
+    }
+
+    // 2. Sandbox Mode (Landing Page)
+    if (!currentRank) {
+        let keyName = e.key.toLowerCase();
+        const code = e.code.toLowerCase(); // Use 'code' to distinguish Left/Right keys
+        
+        // Map special keys to our IDs
+        if (e.key === " ") keyName = " ";
+        else if (e.key === "Meta") keyName = "meta";
+        else if (["Shift", "Control", "Alt", "Enter", "Backspace"].includes(e.key)) {
+            keyName = code.replace('key', ''); // Becomes 'shiftleft', 'controlright', etc.
+        }
+
+        const finger = fingerMap[e.key.toLowerCase()];
+        if (finger) {
+            const indicator = document.getElementById('finger-indicator');
+            if (indicator) indicator.innerText = finger;
+        }
+
+        const keyEl = document.getElementById(`key-${keyName}`);
+        if (keyEl) {
+            keyEl.classList.add('active-key');
+            setTimeout(() => keyEl.classList.remove('active-key'), 200);
+        }
+    }
+});
+
 input.addEventListener('input', (e) => {
     if (!text || currentIndex >= text.length || input.disabled) return;
     
@@ -822,6 +925,31 @@ function checkQuizAnswer(answer) {
         // Optional: shake the button or highlight red
     }
 }
+startLesson(null, null);
+
+function updateFadeEffect() {
+    const container = document.getElementById('display-container');
+    const { scrollTop, scrollHeight, clientHeight } = container;
+    
+    // If text is too short to scroll, remove the effect entirely
+    if (scrollHeight <= clientHeight) {
+        container.classList.remove('faded');
+        return;
+    }
+
+    container.classList.add('faded');
+    
+    // Calculate top fade: if at top (0), fade is 0%. If scrolled down, fade is 15%.
+    const topFade = scrollTop > 10 ? "15%" : "0%";
+    // Calculate bottom fade: if at bottom, fade is 100%. If more to scroll, fade is 85%.
+    const bottomFade = (scrollTop + clientHeight >= scrollHeight - 10) ? "100%" : "85%";
+
+    container.style.setProperty('--top-fade', topFade);
+    container.style.setProperty('--bottom-fade', bottomFade);
+}
+
+// Attach the listener
+document.getElementById('display-container').addEventListener('scroll', updateFadeEffect);
 </script>
 </body>
 </html>
