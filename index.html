@@ -1,0 +1,827 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Typing Ranks Pro</title>
+    <style>
+        :root { 
+            --sidebar-width: 260px;
+            --primary: #2563eb; 
+            --sidebar-bg: #1e293b;
+            --bg: #f1f5f9; 
+            --error-red: #ef4444;
+            --key-bg: #ffffff;
+            --key-text: #475569;
+            --key-border: #cbd5e1;
+            /* Finger Zone Colors */
+    --lp: #ffcfcf; --lr: #ffdfcf; --lm: #ffffcf; --li: #cfcfcf; /* Left: Pinky, Ring, Middle, Index */
+    --ri: #d0f0fd; --rm: #e0e0ff; --rr: #f0e0ff; --rp: #ffe0f5; /* Right: Index, Middle, Ring, Pinky */
+    --thumb: #f1f5f9; /* Thumb (Space) */
+        }
+
+        * { box-sizing: border-box; }
+        body { font-family: 'Inter', sans-serif; margin: 0; display: flex; height: 100vh; width: 100vw; background: var(--bg); overflow: hidden; }
+
+        /* Sidebar & Layout */
+        #sidebar { width: var(--sidebar-width); min-width: var(--sidebar-width); background: var(--sidebar-bg); color: white; display: flex; flex-direction: column; transition: transform 0.3s ease; z-index: 1000; }
+        #sidebar-header { padding: 25px 15px; font-size: 1.1rem; font-weight: 800; border-bottom: 1px solid #334155; display: flex; justify-content: space-between; align-items: center; }
+        #close-sidebar { display: none; background:none; border:none; color:white; cursor:pointer; font-size:1.4rem; }
+        #rank-list { flex-grow: 1; overflow-y: auto; padding: 10px 0; }
+        .rank-item { padding: 14px 20px; cursor: pointer; font-size: 0.9rem; color: #cbd5e1; border-left: 4px solid transparent; white-space: nowrap; }
+        .rank-item.active { background: #0f172a; color: white; border-left: 4px solid var(--primary); }
+        #menu-btn { display: none; position: fixed; top: 15px; left: 15px; background: var(--sidebar-bg); color: white; border: none; padding: 10px 12px; border-radius: 8px; cursor: pointer; z-index: 900; font-size: 1.2rem; }
+        #sidebar-overlay { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 950; }
+
+        /* Main Game Area */
+        main { flex: 1; display: flex; flex-direction: column; align-items: center; padding: 20px; height: 100vh; min-width: 0; }
+        #stats-bar { margin-top: 10px; margin-bottom: 15px; display: flex; align-items: center; gap: 20px; background: white; padding: 10px 30px; border-radius: 50px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); font-weight: 700; flex-shrink: 0; }
+        .stat-val { color: var(--primary); margin-left: 5px; }
+
+        /* Typing Display */
+        #display-container { width: 100%; max-width: 850px; flex: 1; background: white; padding: 40px; border-radius: 15px; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.1); overflow-y: auto; scroll-behavior: smooth;
+    position: relative; mask-image: linear-gradient(to bottom, transparent, black 15%, black 85%, transparent);
+    -webkit-mask-image: linear-gradient(to bottom, transparent, black 15%, black 85%, transparent); }
+        #display { width: 100%; font-family: 'Courier New', Courier, monospace; line-height: 2.2; color: #94a3b8; font-size: 1.8rem; text-align: left; }
+        .word-block { display: inline-block; white-space: nowrap; margin-right: 0.3em; }
+        .char { position: relative; }
+        .char.correct:not(.missed) { color: #1e293b; }
+        .char.correct.missed { color: var(--error-red); text-decoration: underline; }
+        .char.current { background: #dbeafe; color: #1e293b; outline: 2px solid var(--primary); border-radius: 2px; }
+
+/* --- THE CONSTRAINED KEYBOARD BACKER --- */
+#keyboard-container { 
+    display: none; 
+    flex-direction: column; 
+    gap: 0.5%; /* Using % for gaps keeps the math tight */
+    background: #cbd5e1; 
+    padding: 12px; 
+    border-radius: 12px; 
+    width: 100%; 
+    max-width: 850px; 
+    margin: 20px auto; 
+    flex-shrink: 0; 
+    box-sizing: border-box; /* Crucial: padding won't expand the width */
+}
+
+.kb-row { 
+    display: flex; 
+    gap: 0.5%; 
+    width: 100%; 
+    margin-bottom: 4px; 
+}
+
+/* Standard Letter Key: The "1u" base */
+.key { 
+    background: var(--key-bg); 
+    border-radius: 6px; 
+    height: 44px; 
+    display: flex; 
+    align-items: center; 
+    justify-content: center; 
+    font-size: 0.8rem; 
+    font-weight: 600; 
+    color: var(--key-text); 
+    box-shadow: 0 3px 0 #94a3b8; 
+    text-transform: lowercase;
+    flex: 1; /* All standard keys share equal space */
+    min-width: 0; 
+    position: relative;
+    padding-bottom: 5px;
+}
+
+/* --- ROW-SPECIFIC OVERRIDES (Percentages of total 100% width) --- */
+
+/* Row 1: Backspace is large */
+.key-back { flex: 2; } 
+
+/* Row 2: Tab (1.5u) and Backslash (1.25u) */
+.key-tab { flex: 1.5; }
+#key-\\ { flex: 1.25; }
+
+/* Row 3: Launcher/Search (1.75u) and Enter (2.25u) */
+.key-search { flex: 2; font-size: 1.1rem; }
+.key-enter { flex: 2; }
+
+/* Row 4: Shift-L (2.25u) and Shift-R (2.75u) */
+/* These ratios align 'B' and 'N' near the center-point */
+.key-shift-l { flex: 2.50; }
+.key-shift-r { flex: 2.50; }
+
+/* Row 5: The Bottom Row (The "B" alignment anchor) */
+/* Row 5: Independent Bottom Row Modifiers */
+#ctrl-l { flex: 1.50; } /* Left Control */
+#alt-l  { flex: 1.50; } /* Left Alt */
+
+.key-space { flex: 5.50; } /* Space Bar Anchor */
+
+#alt-r  { flex: 1.90; } /* Right Alt (Slightly smaller for D-pad room) */
+#ctrl-r { flex: 1.90; } /* Right Control (Slightly smaller for D-pad room) */
+
+    /* This selector is strong enough to override the !important finger colors */
+.key.active-key, 
+.kb-row .key.active-key { 
+    background-color: var(--primary) !important; 
+    color: white !important; 
+    transform: translateY(2px); 
+    box-shadow: none; 
+}
+
+/* Ensure the finger label (LP, LR, etc.) turns white when the key is active for better contrast */
+.key.active-key::before {
+    color: rgba(255, 255, 255, 0.8) !important;
+}
+
+        #hidden-input { position: absolute; opacity: 0; pointer-events: none; }
+
+        @media (max-width: 950px) {
+            #menu-btn { display: block; }
+            #close-sidebar { display: block; }
+            #sidebar { position: fixed; top: 0; left: 0; bottom: 0; transform: translateX(-100%); }
+            #sidebar.open { transform: translateX(0); }
+            #sidebar-overlay.active { display: block; }
+            #stats-bar { margin-top: 60px; }
+            #display { font-size: 1.4rem; }
+        }
+
+/* Tactile Homing Bumps for F and J */
+
+.key::before {
+    content: attr(data-finger);
+    position: absolute;
+    bottom: 2px;
+    left: 4px;
+    font-size: 0.55rem;
+    color: #94a3b8;
+    font-weight: 800;
+    opacity: 0.7;
+}
+
+#key-f, #key-j {
+    position: relative;
+}
+
+#key-f::after, #key-j::after {
+    content: '';
+    position: absolute;
+    bottom: 2px;
+    left: 35%;
+    width: 30%;
+    height: 3px;
+    background: #888585; /* Subtle ridge color */
+    border-radius: 10px;
+}
+
+/* Video Placeholder Styling */
+#video-placeholder {
+    display: none;
+    width: 100%;
+    height: 100%;
+    background: #000;
+    border-radius: 10px;
+    color: white;
+    justify-content: center;
+    align-items: center;
+    font-weight: bold;
+    flex-direction: column;
+    gap: 15px;
+}
+
+/* Color Classes */
+.lp { background-color: var(--lp) !important; }
+.lr { background-color: var(--lr) !important; }
+.lm { background-color: var(--lm) !important; }
+.li { background-color: var(--li) !important; }
+.ri { background-color: var(--ri) !important; }
+.rm { background-color: var(--rm) !important; }
+.rr { background-color: var(--rr) !important; }
+.rp { background-color: var(--rp) !important; }
+.th { background-color: var(--thumb) !important; }
+
+/* Sidebar Shield Styles */
+.rank-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 15px;
+    cursor: pointer;
+    transition: all 0.2s;
+    color: #cbd5e1; /* Light text for readability */
+}
+
+.rank-shield {
+    width: 12px;
+    height: 12px;
+    border-radius: 3px;
+    flex-shrink: 0;
+    box-shadow: 0 0 4px rgba(0,0,0,0.4);
+}
+
+.rank-item.active {
+    background: rgba(255, 255, 255, 0.1);
+    color: white;
+    font-weight: 600;
+}
+
+/* Video Responsive Container */
+#video-placeholder {
+    width: 100%;
+    max-width: 800px;
+    aspect-ratio: 16 / 9;
+    background: #000;
+    border-radius: 12px;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+    </style>
+</head>
+<body>
+
+<button id="menu-btn" onclick="toggleSidebar()">☰</button>
+<div id="sidebar-overlay" onclick="toggleSidebar()"></div>
+
+<nav id="sidebar">
+    <div id="sidebar-header">
+        <span>TYPING RANKS</span>
+        <button id="close-sidebar" onclick="toggleSidebar()">✕</button>
+    </div>
+    <div id="rank-list"></div>
+</nav>
+
+<main>
+    <div id="stats-bar">
+    <div>WPM <span id="wpm" class="stat-val">0</span></div>
+    <div>ACC <span id="acc" class="stat-val">100</span>%</div>
+    <div>TIME <span id="timer" class="stat-val">60</span>s</div> 
+    <button onclick="restartLesson()" style="background:var(--primary); color:white; border:none; padding:5px 12px; border-radius:12px; cursor:pointer;">Restart</button>
+</div>
+
+    <div id="display-container">
+    <div id="display">Select a rank...</div>
+    <div id="video-placeholder">
+        <div style="font-size: 3rem;">▶</div>
+        <p>Instructional Video: Finding the Home Row</p>
+        <p style="font-size: 0.9rem; font-weight: normal; color: #94a3b8;">(Placeholder for YouTube/Vimeo embed)</p>
+    </div>
+</div>
+
+    <div id="keyboard-container">
+        <div class="kb-row">
+            <div class="key lp" id="key-` border" data-finger="LP">`</div>
+            <div class="key lp" id="key-1" data-finger="LP">1</div>
+            <div class="key lr" id="key-2" data-finger="LR">2</div>
+            <div class="key lm" id="key-3" data-finger="LM">3</div>
+            <div class="key li" id="key-4" data-finger="LI">4</div>
+            <div class="key li" id="key-5" data-finger="LI">5</div>
+            <div class="key ri" id="key-6" data-finger="RI">6</div>
+            <div class="key ri" id="key-7" data-finger="RI">7</div>
+            <div class="key rm" id="key-8" data-finger="RM">8</div>
+            <div class="key rr" id="key-9" data-finger="RR">9</div>
+            <div class="key rp" id="key-0" data-finger="RP">0</div>
+            <div class="key rp" id="key--" data-finger="RP">-</div>
+            <div class="key rp" id="key-=" data-finger="RP">=</div>
+            <div class="key key-back rp" data-finger="RP">back</div>
+        </div>
+        <div class="kb-row">
+    <div class="key key-tab lp" data-finger="LP">tab</div>
+    <div class="key lp" id="key-q" data-finger="LP">q</div>
+    <div class="key lr" id="key-w" data-finger="LR">w</div>
+    <div class="key lm" id="key-e" data-finger="LM">e</div>
+    <div class="key li" id="key-r" data-finger="LI">r</div>
+    <div class="key li" id="key-t" data-finger="LI">t</div>
+    <div class="key ri" id="key-y" data-finger="RI">y</div>
+    <div class="key ri" id="key-u" data-finger="RI">u</div>
+    <div class="key rm" id="key-i" data-finger="RM">i</div>
+    <div class="key rr" id="key-o" data-finger="RR">o</div>
+    <div class="key rp" id="key-p" data-finger="RP">p</div>
+    <div class="key rp" id="key-[" data-finger="RP">[</div>
+    <div class="key rp" id="key-]" data-finger="RP">]</div>
+    <div class="key rp" id="key-\" data-finger="RP">\</div>
+</div>
+        <div class="kb-row">
+    <div class="key key-search lp" data-finger="LP">ο</div>
+    <div class="key lp" id="key-a" data-finger="LP">a</div>
+    <div class="key lr" id="key-s" data-finger="LR">s</div>
+    <div class="key lm" id="key-d" data-finger="LM">d</div>
+    <div class="key li" id="key-f" data-finger="LI">f</div>
+    <div class="key li" id="key-g" data-finger="LI">g</div>
+    <div class="key ri" id="key-h" data-finger="RI">h</div>
+    <div class="key ri" id="key-j" data-finger="RI">j</div>
+    <div class="key rm" id="key-k" data-finger="RM">k</div>
+    <div class="key rr" id="key-l" data-finger="RR">l</div>
+    <div class="key rp" id="key-;" data-finger="RP">;</div>
+    <div class="key rp" id="key-'" data-finger="RP">'</div>
+    <div class="key key-enter rp" data-finger="RP">enter</div>
+</div>
+        <div class="kb-row">
+            <div class="key key-shift-l lp" id="key-left-shift" data-finger="LP">shift</div>
+            <div class="key lp" id="key-z" data-finger="LP">z</div>
+            <div class="key lr" id="key-x" data-finger="LR">x</div>
+            <div class="key lm" id="key-c" data-finger="LM">c</div>
+            <div class="key li" id="key-v" data-finger="LI">v</div>
+            <div class="key li" id="key-b" data-finger="LI">b</div>
+            <div class="key ri" id="key-n" data-finger="RI">n</div>
+            <div class="key ri" id="key-m" data-finger="RI">m</div>
+            <div class="key rm" id="key-," data-finger="RM">,</div>
+            <div class="key rr" id="key-." data-finger="RR">.</div>
+            <div class="key rp" id="key-/" data-finger="RP">/</div>
+            <div class="key key-shift-r rp" id="key-right-shift" data-finger="RP">shift</div>
+        </div>
+        <div class="kb-row">
+    <div class="key lp" id="ctrl-l" data-finger="LP">ctrl</div>
+    <div class="key lr" id="alt-l" data-finger="LR">alt</div>
+    <div class="key key-space th" id="key- " data-finger="RT">space</div>
+    <div class="key rr" id="alt-r" data-finger="RR">alt</div>
+    <div class="key rp" id="ctrl-r" data-finger="RP">ctrl</div>
+</div>
+    </div>
+    <input type="text" id="hidden-input" autocomplete="off" spellcheck="false">
+</main>
+
+<script>
+const rankRegistry = {
+    "Beginner 2": ["j", "f", " ", "u", "r", "k", "d", "e", "i", "c", "g", "n"],
+    "Beginner 3": ["t", "s", "l", "o", "b", "a", "v", "h", "m", ".", ","],
+    "Beginner 4": ["w", "x", ";", "q", "y", "p", "z", "/"],
+    "Intermediate 1": ["SHIFT"], 
+    "Intermediate 2": ["!", "?", "'", '"', ":", "-"],
+    "Advanced 3": ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0"],
+    "Professional 3": ["<", ">", "\\", "|", "`", "~", "@", "#", "$", "%", "^", "&", "*", "(", ")", "_", "=", "+", "[", "]", "{", "}"],
+    "Master 2": ["CTRL", "ALT"]
+};
+
+const rankTests = {
+    "Intermediate 3": [
+        "The red dog ran home fast to get his food now.",
+        "A tall tree fell down near the blue lake today.",
+        "She left her gold ring back in the dark cave.",
+        "Five birds flew over the high stone wall fast.",
+        "He must find the lost keys near the back door."
+    ],
+    "Advanced 1": [
+        "Walking through the quiet forest can help you feel calm and happy while the birds sing in the tall green trees.",
+        "The bright sun shines on the blue ocean waves while children play in the sand and build a very large castle.",
+        "Learning to type fast is a great way to save time every single day when you are working on your new computer.",
+        "If you practice your keys every morning you will soon find that you can type without ever looking at your hands.",
+        "A small spark can start a very big fire if the wind is blowing hard across the dry grass in the open field."
+    ],
+    "Advanced 2": [
+        "Many people believe that learning to type quickly is a vital skill in the modern world because almost every job requires using a computer for several hours each day to communicate with team members and complete various tasks.",
+        "The history of our world is filled with amazing stories of people who traveled across the sea to find new lands and build a better life for their families despite the many risks they faced during the long journey.",
+        "Success often comes to those who are willing to work hard and never give up on their dreams even when things get difficult or stay slow for a long time before finally showing signs of real progress and growth.",
+        "Eating a balanced diet with plenty of fruits and vegetables is essential for maintaining a healthy body and mind throughout your life so that you have the energy to pursue your goals and enjoy your favorite hobbies.",
+        "When the winter snow begins to fall and the temperature drops below freezing we must make sure to wear warm clothes and stay inside by the fire to avoid catching a cold or getting sick during the holiday season."
+    ],
+    "Professional 1": [
+        "Exploration has always been a part of the human spirit, leading us to cross vast oceans and eventually reach for the stars. Today, we continue that journey by developing new technologies that allow us to live and work in space for long periods, proving that our curiosity knows no bounds as we look toward the distant red planet and the stars.",
+        "The internet has changed the way we access information and connect with people from all around the globe in an instant. While this technology provides us with many benefits, it also presents new challenges regarding our privacy and the security of our personal data as we navigate the complex digital landscape of the twenty first century.",
+        "Volunteering your time to help those in need is a rewarding experience that can make a positive impact on your local community. Whether you are working at a food bank or mentoring a student, your efforts contribute to a kinder world where everyone has the support they need to succeed and thrive despite the obstacles they face.",
+        "Sustainable living is becoming increasingly important as we look for ways to protect our environment for future generations. By reducing our waste and using renewable energy sources, we can help ensure that our planet remains a healthy and beautiful place to live for many years to come as we strive to create a more balanced and green economy.",
+        "The study of philosophy encourages us to ask deep questions about the nature of existence and the values that guide our actions. By reflecting on the thoughts of great thinkers throughout history, we can gain a better understanding of ourselves and the world around us, helping us to lead more meaningful and purposeful lives."
+    ],
+    "Professional 2": [
+        "The art of storytelling has evolved from ancient cave paintings to digital cinema, yet the core purpose remains the same: to share experiences and connect with others. When we read a well-written book or watch a moving film, we are transported into another person's life, allowing us to build empathy and understand perspectives that are different from our own. This connection is what makes the humanities so essential to our shared global culture today.",
+        "Scientific research is a collaborative effort that requires patience, precision, and a willingness to challenge existing ideas. Researchers spend years conducting experiments and analyzing data to uncover the mysteries of the natural world, from the smallest subatomic particles to the largest galaxies in the universe. Each discovery builds upon the work of those who came before, moving humanity forward in its quest for knowledge and truth.",
+        "Classical music has a unique power to evoke a wide range of emotions, from the quiet joy of a piano sonata to the grand intensity of a full symphony orchestra. Composers like Bach, Mozart, and Beethoven spent their lives perfecting their craft, creating timeless masterpieces that continue to inspire and move audiences centuries after they were first written. Listening to these works allows us to appreciate the beauty of human creativity.",
+        "Global trade has connected economies in ways that were once unimaginable, allowing goods and services to flow across borders with ease. This interdependence has led to increased wealth and innovation in many parts of the world, but it also means that economic shifts in one country can have a ripple effect across the entire globe. Understanding these complex relationships is key to navigating the modern international business environment.",
+        "The development of artificial intelligence is one of the most significant technological advancements of our time, with the potential to transform almost every aspect of our lives. From healthcare to transportation, AI is already being used to solve complex problems and improve efficiency. However, as this technology continues to evolve, we must also consider the ethical implications and ensure that it is used for the benefit of all humanity."
+    ],
+    "Master 1": [
+        "Architecture is often described as frozen music, a physical manifestation of a culture's values and technological capabilities at a specific point in history. From the towering stone pyramids of Egypt to the glass-and-steel skyscrapers that define our modern city skylines, every structure tells a story of human ambition. Engineers must balance the laws of physics with the desires of aesthetics, ensuring that a building is not only beautiful to behold but also safe and functional for the thousands of people who will inhabit its spaces every single day.",
+        "Marine biology is the study of life in the ocean, a vast and largely unexplored frontier that covers more than seventy percent of our planet's surface. From the colorful coral reefs in shallow tropical waters to the strange and bioluminescent creatures that live in the dark depths of the abyss, the ocean is home to an incredible diversity of life. Biologists work to understand these complex ecosystems and the impact of climate change on marine habitats, which is vital for the survival of countless species and our own environment.",
+        "The Renaissance was a period of great cultural and intellectual rebirth that began in Italy during the fourteenth century and eventually spread across Europe. This era saw a renewed interest in classical art, literature, and science, leading to the works of iconic figures like Leonardo da Vinci and Michelangelo. It was a time of exploration and discovery, both in the physical world and in the realm of ideas, laying the groundwork for the modern world and changing the way we perceive the human experience and our place in the universe.",
+        "Cybersecurity is a critical concern in our increasingly digital world, as hackers and other malicious actors seek to exploit vulnerabilities in our computer systems and networks. Protecting sensitive information requires a multi-layered approach that includes strong passwords, encryption, and regular software updates. As technology continues to advance, the methods used by cybercriminals become more sophisticated, making it essential for individuals and organizations to stay informed and proactive in their efforts to defend against potential threats.",
+        "Astronomy is one of the oldest sciences, driven by our innate curiosity about the cosmos and our place within it. By using powerful telescopes and other advanced instruments, astronomers are able to observe distant stars, planets, and galaxies, uncovering the secrets of the universe's birth and evolution. Every new discovery, from the detection of gravitational waves to the imaging of a black hole, expands our understanding of the laws of physics and inspires us to continue our journey of exploration into the vast and mysterious reaches of space."
+    ],
+    "Master 3": [
+        "In 1912, the Titanic sank below the cold North Atlantic; sadly, many of its passengers never returned to their homes. This tragedy led to significant changes in maritime law, specifically regarding the number of lifeboats required on large vessels. Today, we remember the event not just as a disaster, but as a turning point in engineering safety. If we study history closely, we learn that progress often comes at a high price, yet it is through these lessons that we build a safer world for future generations to explore without such great risks.",
+        "The Great Depression of the 1930s was a period of severe economic hardship that affected millions of people worldwide; it began with the stock market crash in 1929 and lasted for nearly a decade. During this time, unemployment reached record highs, and many families struggled to find food and shelter. Governments around the world implemented new policies to stimulate growth and provide relief, such as the New Deal in the United States. These measures eventually led to a slow recovery, but the impact of the era is still felt today.",
+        "Space exploration reached a historic milestone in 1969 when the Apollo 11 mission successfully landed the first humans on the moon; Neil Armstrong's famous words, 'That's one small step for man, one giant leap for mankind,' resonated across the globe. This achievement was the result of years of intense research and development, involving thousands of scientists and engineers. It proved that humanity could overcome immense challenges to reach new frontiers, inspiring a generation to look up at the stars with a sense of wonder.",
+        "The Industrial Revolution transformed society from an agrarian economy to one dominated by manufacturing and industry; it began in Britain in the late 18th century and quickly spread to other parts of the world. New inventions like the steam engine and the power loom revolutionized production, leading to urbanization and the growth of modern cities. While this era brought about significant economic progress, it also led to difficult working conditions and environmental issues that we are still working to address in the present day.",
+        "The fall of the Berlin Wall in 1989 was a powerful symbol of the end of the Cold War and the reunification of Germany; it marked the beginning of a new era in international relations. For nearly thirty years, the wall had divided East and West, representing the ideological split between communism and democracy. When the barriers finally came down, it was a moment of immense joy and hope for millions of people. This event paved the way for the integration of Europe and a shift toward a more connected and peaceful world."
+    ]
+};
+
+const dictionary = [
+    "fire", "rice", "dice", "rude", "duke", "kind", "fine", "nice", "neck", "deck", "curd", "grin", "iced", "under", "inner", "fender", "cider", "judge", "fence", "the", "quick", "brown", "fox", "jumps", "over", "lazy", "dog", "back", "vex", "quartz", "ship", "time", "vocal", "might", "bold", "salt", "this", "that", "from", "with",
+    // Adding words for Intermediate 2 symbols
+    "don't", "it's", "can't", "stop!", "run?", "wait:", "fast-track", "well-done", "he's", "she's", "really?", "help!"
+];
+
+const ranks = ["Beginner 1", "Beginner 2", "Beginner 3", "Beginner 4", "Intermediate 1", "Intermediate 2", "Intermediate 3", "Advanced 1", "Advanced 2", "Advanced 3", "Professional 1", "Professional 2", "Professional 3", "Master 1", "Master 2", "Master 3"];
+const showKbRanks = ["Beginner 2", "Beginner 3", "Beginner 4", "Intermediate 1", "Intermediate 2", "Advanced 3", "Professional 3", "Master 2"];
+const master2Missions = [
+    {
+        id: "select_copy_paste",
+        instruction: "1. Click the text below. 2. Select All (Ctrl+A). 3. Copy (Ctrl+C). 4. Tab to the empty box. 5. Paste (Ctrl+V). 6. Enter to Submit.",
+        setup: { source: "The quick brown fox jumps over the lazy dog.", target: "" },
+        validate: (state) => state.target === state.source && state.focused === "submit"
+    },
+    {
+        id: "backspace_word",
+        instruction: "Hold Ctrl and press Backspace to delete the entire word 'incorrect'.",
+        setup: { text: "This is incorrect" },
+        validate: (state) => state.text.trim() === "This is"
+    },
+    {
+        id: "caps_lock",
+        instruction: "Enable CAPS LOCK and type 'STOP'.",
+        validate: (state) => state.typed === "STOP"
+    },
+    {
+        id: "quiz_browser",
+        type: "choice",
+        instruction: "Knowledge Check: Which shortcut closes the current browser tab?",
+        options: ["Ctrl + T", "Ctrl + W", "Alt + F4", "Ctrl + Shift + W"],
+        correct: "Ctrl + W"
+    },
+    {
+        id: "quiz_alt_tab",
+        type: "choice",
+        instruction: "Knowledge Check: How do you quickly switch between open windows/apps?",
+        options: ["Alt + Shift", "Ctrl + Tab", "Alt + Tab", "Win + D"],
+        correct: "Alt + Tab"
+    }
+];
+const leftHandKeys = ['q', 'w', 'e', 'r', 't', 'a', 's', 'd', 'f', 'g', 'z', 'x', 'c', 'v', 'b', '1', '2', '3', '4', '5', '!', '@', '#', '$', '%', '`', '~'];
+const rightHandKeys = ['y', 'u', 'i', 'o', 'p', 'h', 'j', 'k', 'l', ';', 'n', 'm', ',', '.', '/', '6', '7', '8', '9', '0', '^', '&', '*', '(', ')', '-', '=', '_', '+', '[', ']', '{', '}', '|', ':', '"', '<', '>', '?'];
+const shiftLayerMap = { '!': '1', '@': '2', '#': '3', '$': '4', '%': '5', '^': '6', '&': '7', '*': '8', '(': '9', ')': '0', '_': '-', '+': '=', '{': '[', '}': ']', '|': '\\', ':': ';', '"': "'", '<': ',', '>': '.', '?': '/' };
+
+const sidebar = document.getElementById('sidebar'), display = document.getElementById('display'), input = document.getElementById('hidden-input'), kbContainer = document.getElementById('keyboard-container');
+let currentIndex = 0, text = "", currentRank = "", startTime = null, timerInterval = null, timeLeft = 60, errorIndices = new Set();
+
+function getLessonContent(rank) {
+    // 1. If it's a timed test, the startLesson function handles it from rankTests
+    if (rankTests[rank]) return ""; 
+
+    const allRanks = Object.keys(rankRegistry);
+    const rankIdx = allRanks.indexOf(rank);
+    
+    // 2. Build the "Already Learned" key set
+    let oldKeys = [];
+    for (let i = 0; i < rankIdx; i++) {
+        const keys = rankRegistry[allRanks[i]];
+        if (Array.isArray(keys)) {
+            oldKeys = oldKeys.concat(keys.filter(k => k !== "SHIFT"));
+        }
+    }
+
+    // 3. SPECIAL HANDLING: Intermediate 1 (Capitalization)
+    if (rank === "Intermediate 1") {
+        let words = dictionary.filter(w => w.split('').every(c => oldKeys.includes(c.toLowerCase())));
+        let selected = [];
+        for(let i=0; i<20; i++) {
+            let w = words[Math.floor(Math.random() * words.length)];
+            if (Math.random() > 0.5) w = w.charAt(0).toUpperCase() + w.slice(1);
+            selected.push(w);
+        }
+        return selected.join(' ');
+    }
+
+    // 4. GENERAL PRACTICE LOGIC (Intermediate 2, Beginner 2-4, etc.)
+    const newKeys = rankRegistry[rank] || [];
+    let combinedKeys = [...newKeys, ...oldKeys];
+    
+    // Find words that use the new keys
+    let priorityWords = dictionary.filter(word => 
+        word.split('').every(char => combinedKeys.includes(char.toLowerCase())) &&
+        word.split('').some(char => newKeys.includes(char.toLowerCase()))
+    );
+
+    // 5. Build the intro sequence (The "jj ff" drills)
+    let intro = generateSequence(newKeys, 10);
+    
+    // 6. Build the practice words
+    let practice = [];
+    for(let i=0; i<15; i++) {
+        if (priorityWords.length > 0) {
+            practice.push(priorityWords[Math.floor(Math.random() * priorityWords.length)]);
+        } else {
+            // FALLBACK: If no dictionary words fit the symbols (like in Intermediate 2),
+            // generate random 3-character drills using the new keys
+            let drill = "";
+            const cleanNew = newKeys.filter(k => k.length === 1 && k !== " ");
+            for(let j=0; j<3; j++) drill += cleanNew[Math.floor(Math.random() * cleanNew.length)];
+            practice.push(drill);
+        }
+    }
+    
+    return (intro + " " + practice.join(' ')).trim();
+}
+
+function generateSequence(keys, length) {
+    if (!keys || keys.length === 0) return "";
+    let s = "";
+    const clean = keys.filter(k => k.length === 1 && k !== " ");
+    for (let i = 0; i < length; i++) {
+        s += clean[Math.floor(Math.random() * clean.length)];
+        if (i % 2 === 1) s += " ";
+    }
+    return s.trim();
+}
+
+function startLesson(rank, element) {
+    if (timerInterval) clearInterval(timerInterval);
+    document.querySelectorAll('.rank-item').forEach(i => i.classList.remove('active'));
+    if (element) element.classList.add('active');
+    
+    currentRank = rank;
+    input.disabled = false;
+    
+    const videoPlaceholder = document.getElementById('video-placeholder');
+    const displayElement = document.getElementById('display');
+
+    if (rank === "Beginner 1") {
+        text = "fjfj fjf jfjf fdkj ddkj ffff jjjj kkkk fjd kjf dddd";
+        displayElement.style.display = 'none';
+        videoPlaceholder.style.display = 'flex';
+        // Inject the YouTube Embed
+        videoPlaceholder.innerHTML = `<iframe width="100%" height="100%" src="https://www.youtube.com/embed/CMlO9X1NOyk?si=V3YrW7Wfa-lDLgqz" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>`;
+    } else {
+        videoPlaceholder.style.display = 'none';
+        videoPlaceholder.innerHTML = ""; // Clear video when switching ranks
+        displayElement.style.display = 'block';
+        
+        if (rank === "Master 2") {
+            setupMaster2Mission(0);
+            return;
+        }
+        
+        if (rankTests[rank]) {
+            const testPool = rankTests[rank];
+            text = testPool[Math.floor(Math.random() * testPool.length)];
+        } else {
+            text = getLessonContent(rank);
+        }
+    }
+
+    // Reset stats and render
+    currentIndex = 0; errorIndices.clear(); startTime = null;
+    timeLeft = 60;
+    document.getElementById('timer').innerText = timeLeft;
+    document.getElementById('wpm').innerText = "0";
+    document.getElementById('acc').innerText = "100";
+    kbContainer.style.display = showKbRanks.includes(rank) ? 'flex' : 'none';
+
+    renderDisplay();
+    highlightKey();
+    input.focus();
+}
+input.addEventListener('input', (e) => {
+    if (!text || currentIndex >= text.length || input.disabled) return;
+    
+    if (!startTime) {
+        startTime = new Date();
+        // ONLY start the countdown if the rank is in the rankTests object
+        if (rankTests[currentRank]) {
+            startTimer();
+        }
+    }
+
+    const charTyped = e.target.value.slice(-1);
+    if (charTyped === text[currentIndex]) {
+        currentIndex++;
+    } else {
+        errorIndices.add(currentIndex);
+    }
+    
+    e.target.value = "";
+    renderStats();
+    renderDisplay();
+    highlightKey();
+
+    if (currentIndex >= text.length) {
+        clearInterval(timerInterval);
+        alert(`Finished! WPM: ${calculateWPM()} | ACC: ${document.getElementById('acc').innerText}%`);
+    }
+});
+
+function startTimer() {
+    timerInterval = setInterval(() => {
+        timeLeft--;
+        document.getElementById('timer').innerText = timeLeft;
+        if (timeLeft <= 0) {
+            clearInterval(timerInterval);
+            input.disabled = true;
+            alert(`Time is up! Final WPM: ${calculateWPM()}`);
+        }
+    }, 1000);
+}
+
+function highlightKey() {
+    document.querySelectorAll('.key').forEach(k => k.classList.remove('active-key'));
+    if (currentIndex < text.length) {
+        const char = text[currentIndex];
+        let targetKeyId = char.toLowerCase();
+        if (shiftLayerMap[char]) targetKeyId = shiftLayerMap[char];
+        
+        const keyEl = document.getElementById(`key-${targetKeyId === ' ' ? ' ' : targetKeyId}`);
+        if (keyEl) keyEl.classList.add('active-key');
+
+        if (/[A-Z]/.test(char) || "~!@#$%^&*()_+{}|:\"<>?".includes(char)) {
+            const side = leftHandKeys.includes(char.toLowerCase()) ? 'key-right-shift' : 'key-left-shift';
+            document.getElementById(side).classList.add('active-key');
+        }
+    }
+}
+
+function renderDisplay() {
+    let globalIdx = 0;
+    const words = text.split(' ');
+    
+    display.innerHTML = words.map(word => {
+        let wordHtml = `<div class="word-block">`;
+        word.split('').forEach(char => {
+            wordHtml += `<span class="char ${getCharState(globalIdx++)}">${char}</span>`;
+        });
+        // Handle the space after the word
+        if (globalIdx < text.length) {
+            wordHtml += `<span class="char ${getCharState(globalIdx++)}">&nbsp;</span>`;
+        }
+        wordHtml += `</div>`;
+        return wordHtml;
+    }).join('');
+
+    // --- AUTO-SCROLL LOGIC ---
+    const currentEl = display.querySelector('.current');
+    if (currentEl) {
+        currentEl.scrollIntoView({
+            behavior: 'smooth', // Makes it slide instead of jump
+            block: 'center'      // Keeps the active line in the vertical middle
+        });
+    }
+}
+
+function getCharState(i) {
+    if (i < currentIndex) return errorIndices.has(i) ? "correct missed" : "correct";
+    return (i === currentIndex) ? "current" : "";
+}
+
+function calculateWPM() {
+    if (!startTime || currentIndex === 0) return 0;
+    const timeElapsed = (new Date() - startTime) / 60000;
+    return Math.round((currentIndex / 5) / timeElapsed) || 0;
+}
+
+function renderStats() {
+    document.getElementById('wpm').innerText = calculateWPM();
+    const acc = currentIndex === 0 ? 100 : Math.round(((currentIndex - errorIndices.size) / currentIndex) * 100);
+    document.getElementById('acc').innerText = Math.max(0, acc);
+}
+
+function restartLesson() { if (currentRank) startLesson(currentRank, null); }
+function toggleSidebar() { sidebar.classList.toggle('open'); document.getElementById('sidebar-overlay').classList.toggle('active'); }
+
+const RANK_COLORS = {
+    "Beginner 1": "#E8F5E9", "Beginner 2": "#A5D6A7", "Beginner 3": "#4CAF50", "Beginner 4": "#1B5E20",
+    "Intermediate 1": "#E3F2FD", "Intermediate 2": "#64B5F6", "Intermediate 3": "#1976D2",
+    "Advanced 1": "#FFF3E0", "Advanced 2": "#FFB74D", "Advanced 3": "#E65100",
+    "Professional 1": "#F3E5F5", "Professional 2": "#BA68C8", "Professional 3": "#7B1FA2",
+    "Master 1": "#F5F5F5", "Master 2": "#9E9E9E", "Master 3": "#000000"
+};
+
+ranks.forEach(rank => {
+    const item = document.createElement('div');
+    item.className = 'rank-item';
+    
+    const shield = document.createElement('div');
+    shield.className = 'rank-shield';
+    shield.style.backgroundColor = RANK_COLORS[rank] || "#fff";
+    
+    const textSpan = document.createElement('span');
+    textSpan.innerText = rank;
+    
+    item.appendChild(shield);
+    item.appendChild(textSpan);
+    
+    item.onclick = () => { 
+        startLesson(rank, item); 
+        if (window.innerWidth <= 950) toggleSidebar(); 
+    };
+    document.getElementById('rank-list').appendChild(item);
+});
+document.addEventListener('click', (e) => { 
+    // If we are in Master 2, don't force focus on the hidden input
+    // because we need to be able to click mission textboxes!
+    if (currentRank === "Master 2") return; 
+
+    if(!input.disabled) input.focus(); 
+});
+let currentMissionIndex = 0;
+
+function renderMissionUI(mission) {
+    if (mission.type === "choice") {
+        return `
+            <div style="display: grid; gap: 10px; margin-top: 10px;">
+                ${mission.options.map(opt => `
+                    <button class="quiz-opt" onclick="checkQuizAnswer('${opt}')" 
+                        style="padding: 12px; border: 1px solid #cbd5e1; border-radius: 6px; background: white; cursor: pointer; text-align: left; font-weight: 600; transition: all 0.2s;">
+                        ${opt}
+                    </button>
+                `).join('')}
+            </div>
+        `;
+    }
+    switch(mission.id) {
+        case "select_copy_paste":
+            return `
+                <textarea id="m-source" readonly style="width: 100%; height: 60px; margin-bottom: 10px; padding: 8px;">${mission.setup.source}</textarea>
+                <textarea id="m-target" placeholder="Paste here..." style="width: 100%; height: 60px; margin-bottom: 10px; padding: 8px;"></textarea>
+                <button id="m-submit" style="padding: 10px 20px; background: #2563eb; color: white; border: none; border-radius: 5px; cursor: pointer;">Submit</button>
+            `;
+        case "backspace_word":
+            return `
+                <p style="font-size: 0.9rem; color: #64748b;">Try it: Hold Ctrl and tap Backspace once.</p>
+                <input type="text" id="m-input" value="${mission.setup.text}" style="width: 100%; padding: 12px; font-size: 1.2rem; border: 1px solid #cbd5e1;">
+            `;
+        case "caps_lock":
+            return `
+                <p id="caps-status" style="font-size: 0.8rem; color: #ef4444;">Caps Lock: OFF</p>
+                <input type="text" id="m-input" placeholder="Type STOP here..." style="width: 100%; padding: 12px; font-size: 1.2rem; border: 1px solid #cbd5e1;">
+            `;
+        default:
+            return `<p>Mission loading...</p>`;
+    }
+}
+
+// Logic injection for each mission
+function setupMaster2Mission(index) {
+    if (index >= master2Missions.length) {
+        showFeedback("ALL MISSIONS COMPLETE!", "#22c55e");
+        setTimeout(() => startLesson("Master 3", null), 2000);
+        return;
+    }
+
+    currentMissionIndex = index;
+    const mission = master2Missions[index];
+    const display = document.getElementById('display');
+    
+    display.innerHTML = `
+        <div class="mission-container" style="font-family: sans-serif; font-size: 1rem; color: #1e293b; text-align: left;">
+            <p style="margin-bottom: 15px;"><strong>Mission ${index + 1}:</strong> ${mission.instruction}</p>
+            <div id="mission-workspace" style="border: 2px dashed #cbd5e1; padding: 20px; border-radius: 8px; background: #f8fafc;">
+                ${renderMissionUI(mission)}
+            </div>
+            <div id="mission-feedback" style="margin-top: 10px; font-weight: bold; color: #ef4444; height: 20px;"></div>
+        </div>
+    `;
+
+    // MISSION-SPECIFIC LISTENERS
+    if (mission.id === "select_copy_paste") {
+        document.getElementById('m-submit').onclick = () => {
+            const state = { target: document.getElementById('m-target').value, source: document.getElementById('m-source').value, focused: document.activeElement.id === 'm-submit' ? 'submit' : '' };
+            if (mission.validate(state)) { showFeedback("Success!", "#22c55e"); setTimeout(() => setupMaster2Mission(index + 1), 1000); }
+            else { showFeedback("Check your paste and use TAB to reach the button!"); }
+        };
+    }
+
+    if (mission.id === "backspace_word") {
+        const inp = document.getElementById('m-input');
+        inp.focus();
+        inp.oninput = () => {
+            if (mission.validate({ text: inp.value })) {
+                showFeedback("Word deleted! Correct.", "#22c55e");
+                setTimeout(() => setupMaster2Mission(index + 1), 1000);
+            }
+        };
+    }
+
+    if (mission.id === "caps_lock") {
+        const inp = document.getElementById('m-input');
+        inp.focus();
+        inp.onkeyup = (e) => {
+            const isCaps = e.getModifierState("CapsLock");
+            document.getElementById('caps-status').innerText = `Caps Lock: ${isCaps ? "ON" : "OFF"}`;
+            document.getElementById('caps-status').style.color = isCaps ? "#22c55e" : "#ef4444";
+            
+            if (mission.validate({ typed: inp.value })) {
+                showFeedback("STOP! Mission Complete.", "#22c55e");
+                setTimeout(() => setupMaster2Mission(index + 1), 1000);
+            }
+        };
+    }
+}
+
+function showFeedback(msg, color = "#ef4444") {
+    const fb = document.getElementById('mission-feedback');
+    if (fb) {
+        fb.innerText = msg;
+        fb.style.color = color;
+    }
+}
+
+function checkQuizAnswer(answer) {
+    const mission = master2Missions[currentMissionIndex];
+    if (answer === mission.correct) {
+        showFeedback("Correct!", "#22c55e");
+        setTimeout(() => setupMaster2Mission(currentMissionIndex + 1), 1000);
+    } else {
+        showFeedback("Not quite. Try again!");
+        // Optional: shake the button or highlight red
+    }
+}
+</script>
+</body>
+</html>
