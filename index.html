@@ -569,6 +569,8 @@ function startLesson(rank, element) {
     if (timerInterval) clearInterval(timerInterval);
     document.querySelectorAll('.rank-item').forEach(i => i.classList.remove('active'));
     if (element) element.classList.add('active');
+
+    input.disabled = false;
     
     currentRank = rank;
     const videoPlaceholder = document.getElementById('video-placeholder');
